@@ -29,36 +29,39 @@ defmodule Tzdata.DataBuilder do
 
   defp do_load_and_save_table(content_length, release_version, tzdata_dir, modified_at) do
     ets_table_name = ets_table_name_for_release_version(release_version)
-    table = :ets.new(ets_table_name, [:bag, :named_table])
-    {:ok, map} = Tzdata.BasicDataMap.from_files_in_dir(tzdata_dir)
-    :ets.insert(table, {:release_version, release_version})
-    :ets.insert(table, {:archive_content_length, content_length})
-    :ets.insert(table, {:rules, map.rules})
-    :ets.insert(table, {:zones, map.zones})
-    :ets.insert(table, {:links, map.links})
-    :ets.insert(table, {:zone_list, map.zone_list})
-    :ets.insert(table, {:link_list, map.link_list})
-    :ets.insert(table, {:zone_and_link_list, map.zone_and_link_list})
-    :ets.insert(table, {:by_group, map.by_group})
-    :ets.insert(table, {:leap_sec_data, leap_sec_data(tzdata_dir)})
-    :ets.insert(table, {:modified_at, modified_at})
+    if :ets.whereis(ets_table_name) == :undefined do
+      table = :ets.new(ets_table_name, [:bag, :named_table])
+      {:ok, map} = Tzdata.BasicDataMap.from_files_in_dir(tzdata_dir)
+      :ets.insert(table, {:release_version, release_version})
+      :ets.insert(table, {:archive_content_length, content_length})
+      :ets.insert(table, {:rules, map.rules})
+      :ets.insert(table, {:zones, map.zones})
+      :ets.insert(table, {:links, map.links})
+      :ets.insert(table, {:zone_list, map.zone_list})
+      :ets.insert(table, {:link_list, map.link_list})
+      :ets.insert(table, {:zone_and_link_list, map.zone_and_link_list})
+      :ets.insert(table, {:by_group, map.by_group})
+      :ets.insert(table, {:leap_sec_data, leap_sec_data(tzdata_dir)})
+      :ets.insert(table, {:modified_at, modified_at})
 
-    map.zone_list
-    |> Enum.each(fn zone_name ->
-         insert_periods_for_zone(table, map, zone_name)
-       end)
+      map.zone_list
+      |> Enum.each(fn zone_name ->
+            insert_periods_for_zone(table, map, zone_name)
+          end)
 
-    # remove temporary tzdata dir
-    File.rm_rf(tzdata_dir)
-    ets_tmp_file_name = "#{release_dir()}/#{release_version}.tmp"
-    ets_file_name = ets_file_name_for_release_version(release_version)
-    File.mkdir_p(release_dir())
-    # Create file using a .tmp line ending to avoid it being
-    # recognized as a complete file before writing to it is complete.
-    :ets.tab2file(table, :erlang.binary_to_list(ets_tmp_file_name))
-    :ets.delete(table)
-    # Then rename it, which should be an atomic operation.
-    :file.rename(ets_tmp_file_name, ets_file_name)
+      # remove temporary tzdata dir
+      File.rm_rf(tzdata_dir)
+      ets_tmp_file_name = "#{release_dir()}/#{release_version}.tmp"
+      ets_file_name = ets_file_name_for_release_version(release_version)
+      File.mkdir_p(release_dir())
+      # Create file using a .tmp line ending to avoid it being
+      # recognized as a complete file before writing to it is complete.
+      :ets.tab2file(table, :erlang.binary_to_list(ets_tmp_file_name))
+      :ets.delete(table)
+      # Then rename it, which should be an atomic operation.
+      :file.rename(ets_tmp_file_name, ets_file_name)
+    end
+
     {:ok, content_length, release_version}
   end
 
